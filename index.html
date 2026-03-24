@@ -1,0 +1,337 @@
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weather App + Travel Chatbot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      background: #e0eafc;
+      transition: background 0.5s ease;
+      position: relative;
+    }
+
+    #particles-js {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      top: 0;
+      left: 0;
+    }
+
+    .weather-card {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 2rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 350px;
+      width: 100%;
+      backdrop-filter: blur(20px);
+      margin-bottom: 1rem;
+      transition: transform 0.5s ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .weather-slide-left { transform: translateX(-160px); }
+
+    .emoji { font-size: 3rem; margin: 1rem 0; }
+    .temp { font-size: 2.5rem; font-weight: bold; }
+    .details { margin-top: 1rem; font-size: 1.1rem; }
+
+    #chatBtn {
+      padding: 0.75rem 1.5rem;
+      background: #0077ff;
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-weight: bold;
+      cursor: pointer;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 2;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .chatbox {
+      display: none;
+      flex-direction: column;
+      max-width: 400px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      padding: 1rem;
+      overflow: hidden;
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      z-index: 2;
+      animation: slideUp 0.5s ease forwards;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .chat-messages {
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      padding-right: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .message {
+      padding: 0.75rem 1rem;
+      border-radius: 1rem;
+      max-width: 80%;
+      line-height: 1.4;
+    }
+
+    .user { background: #dcf8c6; align-self: flex-end; }
+    .bot { background: #ffffffc0; align-self: flex-start; }
+
+    .timestamp {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 0.2rem;
+    }
+
+    .chat-input {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .chat-input input {
+      padding: 0.75rem;
+      border-radius: 1rem;
+      border: 1px solid #ccc;
+    }
+
+    .chat-input button {
+      background: #0077ff;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 1rem;
+      cursor: pointer;
+    }
+
+    .quick-replies button {
+      margin: 2px;
+      padding: 0.5rem;
+      background: #e0e0e0;
+      border-radius: 1rem;
+      border: none;
+      cursor: pointer;
+    }
+
+    .typing-indicator {
+      font-size: 0.85rem;
+      color: #999;
+      font-style: italic;
+      margin-left: 0.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .weather-card { padding: 1.5rem; font-size: 0.9rem; }
+      .temp { font-size: 2rem; }
+      .emoji { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<div id="particles-js"></div>
+<div class="weather-card" id="weatherCard">
+  <h1 id="weatherGreeting">Loading Weather...</h1>
+</div>
+
+<button id="chatBtn">💬 Travel Chat</button>
+
+<div class="chatbox" id="chatBox">
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="typing-indicator" id="typingIndicator" style="display:none;">Travel Bot is typing...</div>
+  <div class="quick-replies" id="quickReplies"></div>
+  <div class="chat-input">
+    <input type="text" id="userInput" placeholder="Ask about weather, trips...">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+const API_KEY = '406ba34bb0a20ff8347d6289a870ef05';
+const GEMINI_API_KEY = 'AIzaSyCJecQ8qkWfOGXwpDN9ltjUqChoZWqJ_qA';
+let currentWeather = '';
+let currentLocation = '';
+
+function getEmoji(weatherMain) {
+  switch(weatherMain.toLowerCase()) {
+    case 'clear': return '☀️';
+    case 'clouds': return '☁️';
+    case 'rain': return '🌧️';
+    case 'drizzle': return '🌦️';
+    case 'thunderstorm': return '⛈️';
+    case 'snow': return '❄️';
+    case 'mist': case 'fog': case 'haze': return '🌫️';
+    default: return '🌈';
+  }
+}
+
+function showWeather(data) {
+  const weather = data.weather[0];
+  const emoji = getEmoji(weather.main);
+  const card = document.getElementById('weatherCard');
+  const greeting = document.getElementById('weatherGreeting');
+  const hours = new Date().getHours();
+  const timeOfDay = hours < 12 ? 'Morning' : hours < 18 ? 'Afternoon' : 'Evening';
+
+  currentWeather = `${weather.description}, ${Math.round(data.main.temp)}°C`;
+  currentLocation = `${data.name}, ${data.sys.country}`;
+
+  greeting.innerHTML = `Good ${timeOfDay}! Checking the skies above `;
+
+  card.innerHTML += `
+    <div class="emoji">${emoji}</div>
+    <h1>${currentLocation}</h1>
+    <div class="temp">${Math.round(data.main.temp)}°C</div>
+    <div class="details">
+      ${weather.description}<br/>
+      Wind: ${data.wind.speed} m/s<br/>
+      Pressure: ${data.main.pressure} hPa<br/>
+      Humidity: ${data.main.humidity}%
+    </div>
+  `;
+}
+
+function fetchWeather(lat, lon) {
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`;
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      showWeather(data);
+      document.body.style.background = getBackgroundGradient(data.weather[0].main);
+    });
+}
+
+function getBackgroundGradient(condition) {
+  switch(condition.toLowerCase()) {
+    case 'clear': return 'linear-gradient(to right, #fceabb, #f8b500)';
+    case 'clouds': return 'linear-gradient(to right, #d7d2cc, #304352)';
+    case 'rain': return 'linear-gradient(to right, #4e54c8, #8f94fb)';
+    case 'snow': return 'linear-gradient(to right, #e6dada, #274046)';
+    default: return 'linear-gradient(to right, #89f7fe, #66a6ff)';
+  }
+}
+
+function getLocation() {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        fetchWeather(latitude, longitude);
+      },
+      () => alert("Location access denied.")
+    );
+  } else {
+    alert("Geolocation not supported.");
+  }
+}
+
+function sendMessage() {
+  const input = document.getElementById('userInput');
+  const message = input.value.trim();
+  if (!message) return;
+
+  appendMessage('user', message);
+  input.value = '';
+  document.getElementById('typingIndicator').style.display = 'block';
+
+  const prompt = `You are a friendly travel guide. The current weather in the user's location (${currentLocation}) is: ${currentWeather}. Answer the following in short helpful parts:\n\nUser: ${message}`;
+
+  fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById('typingIndicator').style.display = 'none';
+    const botReplies = data.candidates[0].content.parts[0].text.split('\n').filter(line => line.trim());
+    botReplies.forEach((part, index) => {
+      setTimeout(() => appendMessage('bot', part), index * 700);
+    });
+    updateQuickReplies();
+  });
+}
+
+function appendMessage(sender, text) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.classList.add('message', sender);
+  msg.innerHTML = `${text}<div class="timestamp">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateQuickReplies() {
+  const quickReplies = ['Weekend trip', 'Weather tomorrow', 'Plan a picnic'];
+  const container = document.getElementById('quickReplies');
+  container.innerHTML = '';
+  quickReplies.forEach(text => {
+    const btn = document.createElement('button');
+    btn.innerText = text;
+    btn.onclick = () => {
+      document.getElementById('userInput').value = text;
+      sendMessage();
+    };
+    container.appendChild(btn);
+  });
+}
+
+const chatBtn = document.getElementById('chatBtn');
+const chatBox = document.getElementById('chatBox');
+const weatherCard = document.getElementById('weatherCard');
+chatBtn.addEventListener('click', () => {
+  const isVisible = chatBox.style.display === 'flex';
+  chatBox.style.display = isVisible ? 'none' : 'flex';
+  weatherCard.classList.toggle('weather-slide-left', !isVisible);
+});
+
+getLocation();
+
+particlesJS("particles-js", {
+  "particles": {
+    "number": { "value": 80, "density": { "enable": true, "value_area": 800 } },
+    "color": { "value": "#ffffff" },
+    "shape": { "type": "circle" },
+    "opacity": { "value": 0.5 },
+    "size": { "value": 3 },
+    "line_linked": { "enable": true, "distance": 150, "color": "#ffffff", "opacity": 0.4, "width": 1 },
+    "move": { "enable": true, "speed": 3 }
+  },
+  "interactivity": { "detect_on": "canvas", "events": { "onhover": { "enable": true, "mode": "repulse" } } },
+  "retina_detect": true
+});
+</script>
+</body>
+</html>
