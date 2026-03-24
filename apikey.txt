@@ -1,0 +1,6 @@
+AIzaSyCJecQ8qkWfOGXwpDN9ltjUqChoZWqJ_qA
+weather:406ba34bb0a20ff8347d6289a870ef05
+
+ab557b9764bb751aaba681da42c19248
+
+const prompt = `You are a friendly travel guide. The current weather in the user's location (${currentLocation}) is: ${currentWeather}. Answer the following in short helpful parts:\n\nUser: ${message}`;
